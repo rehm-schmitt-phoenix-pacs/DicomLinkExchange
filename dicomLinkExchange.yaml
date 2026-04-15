@@ -3,16 +3,18 @@ openapi: 3.0.0
 info:
   title: DLX API
   description: Prototype of the DICOM Link Exchange (DLX) initiative. The API represents the outcome of an initiative of medical imaging software manufactures to standardize downloads from their systems.
-  version: "1.0"
+  version: "2.0"
 
 servers:
-  - url: /dlx/v1
-    description: Demo server
+  - url: /dlx/v2
+    description: DICOM Link Exchange (DLX) server
 
 paths:
   /api_info:
     description: Provides information on version and implemented capabilities of the API.
     get:
+      tags:
+      - Info
       responses:
         "200":
           description: A JSON string representing information about the API.
@@ -21,9 +23,52 @@ paths:
               schema:
                 $ref: '#/components/schemas/apiInfo'
 
+  /.well-known/openid-configuration:
+    description: |
+      OpenID Connect (OIDC) Discovery endpoint scoped within the DLX base path
+      (e.g. /dlx/v1/.well-known/openid-configuration). This avoids conflicts with a potentially
+      existing system-level /.well-known/openid-configuration.
+      Implementations may either serve the OIDC configuration directly (HTTP 200) or redirect
+      (HTTP 302) to an external IDP or the system-level /.well-known/openid-configuration.
+      This endpoint is optional; its availability is indicated by the 'oidc' capability in /api_info.
+    get:
+      operationId: getOidcConfiguration
+      summary: OpenID Connect Discovery Document
+      description: |
+        Returns the OpenID Connect Discovery Document (RFC 8414 / OIDC Discovery 1.0)
+        for DLX administrative authentication. Two implementation patterns are supported:
+        1. **Direct**: The server returns the OIDC configuration directly (HTTP 200).
+        2. **Redirect**: The server redirects to an external IDP's discovery endpoint (HTTP 302).
+        If not implemented, HTTP 501 is returned.
+      tags:
+        - Info
+      responses:
+        "200":
+          description: |
+            OIDC Discovery Document returned successfully.
+            The response format follows RFC 8414 / OpenID Connect Discovery 1.0.
+            DLX-specific scopes (dlx.creator, dlx.importer, dlx.admin) are listed in scopes_supported.
+          content:
+            application/json:
+              schema:
+                type: object
+                description: RFC 8414 / OIDC Discovery 1.0 document. See https://openid.net/specs/openid-connect-discovery-1_0.html
+        "302":
+          description: Redirect to an external IDP's OIDC discovery endpoint.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+              description: URL of the external IDP's OIDC discovery endpoint.
+        "501":
+          description: Not implemented. This server does not expose an OIDC discovery endpoint.
+
   /token/{value}:
     description: The initial call which accepts only the token (e.g. from a link or QR code) and responds with the TFA questions for the calling system to generate a JWT for all further requests. To enhance security, this call always returns successfully, even if the token value does not actually exist. The feedback on failed or successful authentication is provided by the subsequent /tokentfa/{value} endpoint. To enable the DLX functionalities the HTTP header parameter X-DICOM-LINK-EXCHANGE is required. This allowes pre-existing token URLs to forward to this API endpoint (e.g. https://example.com/portal?token={value} with a HTTP header X-DICOM-LINK-EXCHANGE should return the same result as the defined DLX endpoint https://example.com/dlx/v1/token/{value}) .
     get:
+      tags:
+        - DLX-Consumer
       parameters:
         - in: header
           name: X-DICOM-LINK-EXCHANGE # optional, and used to activate the DLX API functionality
@@ -46,6 +91,8 @@ paths:
   /tokentfa/{value}:
     description: Request to answer the TFA questions from the initial token call. The questions and answers are mapped by their questionId. 
     post:
+      tags:
+        - DLX-Consumer
       parameters:
         - in: path
           name: value
@@ -74,6 +121,8 @@ paths:
   /list:
     description: Returns a list of the metadata of all available medical data items.
     get:
+      tags:
+        - DLX-Consumer
       security:
         - bearerAuth: []
       responses:
@@ -89,6 +138,8 @@ paths:
   /download/{id}:
     description: Returns the data item for the given id with the specified mimeType.
     get:
+      tags:
+        - DLX-Consumer
       security:
         - bearerAuth: []
       parameters:
@@ -116,6 +167,8 @@ paths:
   /downloadall:
     description: Returns all data items as ZIP container in IHE PDI format.
     get:
+      tags:
+        - DLX-Consumer
       security:
         - bearerAuth: []
       responses:
@@ -131,16 +184,307 @@ paths:
         "503":
           $ref: '#/components/responses/comebackLater'
 
+  # --- Proposal: Link Creation ---
+  /tfa_info:
+    description: |
+      Returns information about supported two-factor authentication (TFA) options.
+    get:
+      operationId: getTfaInfo
+      summary: Get supported two-factor authentication (TFA) options
+      description: |
+        Returns information about supported two-factor authentication (TFA) options.
+      tags:
+        - DLX-Creator
+        - Info
+      security:
+        - adminOidcAuth: [dlx.creator]
+        - adminOidcAuth: [dlx.admin]
+      responses:
+        "200":
+          description: Supported TFA options returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/tfaInfo'
+        "401":
+          description: Not authorized.
+        "500":
+          description: Internal server error.
+  
+  /tokens:
+    post:
+      operationId: createToken
+      summary: Create a DLX token link for one or more DICOM studies
+      description: |
+        Creates a DLX token link that grants access to download one or more DICOM studies.
+        Optional two-factor authentication (TFA) methods can be configured to protect the link.
+      tags:
+        - DLX-Creator
+      requestBody:
+        description: Parameters for creating a DLX download link.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/tokensRequest'
+      responses:
+        "200":
+          description: DLX download link and associated metadata created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/tokensResponse'
+        "400":
+          description: Bad request.
+        "401":
+          description: Not Authorized.
+        "403":
+          description: Not Allowed.
+        "500":
+          description: Internal server error.
+      security:
+        - adminOidcAuth: [dlx.creator]
+        - adminOidcAuth: [dlx.admin]
+        - bearerAuth: [dlx.derive]
+    get:
+      operationId: listTokens
+      summary: List all DLX token links
+      description: |
+        Returns a paginated list of all DLX token links with metadata.
+        Pagination follows RFC 8288 semantics. The response contains pagination metadata and the list of token links.
+      tags:
+        - DLX-Creator
+      parameters:
+        - in: query
+          name: page
+          description: Page number to retrieve (1-indexed). Defaults to 1.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: pageSize
+          description: Number of items per page. Defaults to 20.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - in: query
+          name: patientId
+          description: Filter by patient ID. Multiple parameters are combined with AND logic.
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: studyInstanceUid
+          description: "Filter by Study Instance UID. Multiple values (comma-separated) are combined with OR logic. Example: '?studyInstanceUid=uid1,uid2' returns tokens linked to either UID. Parameters are combined with AND logic."
+          required: false
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - in: query
+          name: accessionNumber
+          description: "Filter by accession number. Multiple values (comma-separated) are combined with OR logic. Example: '?accessionNumber=acc1,acc2' returns tokens linked to either accession number. Parameters are combined with AND logic."
+          required: false
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - in: query
+          name: sort
+          description: Sort field (ascending order).
+          required: false
+          schema:
+            type: string
+            enum: [issuedAt, expiresAt]
+            default: issuedAt
+      responses:
+        "200":
+          description: Paginated list of DLX token links.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/paginatedTokensResponse'
+        "401":
+          description: Not Authorized.
+        "500":
+          description: Internal server error.
+      security:
+        - adminOidcAuth: [dlx.creator]
+        - adminOidcAuth: [dlx.admin]
+        - bearerAuth: [dlx.derive]
+  /tokens/{token}:
+    get:
+      operationId: getToken
+      summary: Get details of a DLX token link
+      description: Returns details for a single DLX token link.
+      tags:
+        - DLX-Creator
+      parameters:
+        - in: path
+          name: token
+          description: Token value which identifies the DLX link.
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: DLX token link details returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/tokensResponse'
+        "401":
+          description: Not Authorized.
+        "404":
+          description: Token not found.
+        "500":
+          description: Internal server error.
+      security:
+        - adminOidcAuth: [dlx.creator]
+        - adminOidcAuth: [dlx.admin]
+        - bearerAuth: [dlx.derive]
+    put:
+      operationId: updateToken
+      summary: Update a DLX token link
+      description: Updates the properties of an existing DLX token link.
+      tags:
+        - DLX-Creator
+      parameters:
+        - in: path
+          name: token
+          description: Token value which identifies the DLX link.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Updated parameters for the DLX token link.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/tokensRequest'
+      responses:
+        "200":
+          description: DLX token link updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/tokensResponse'
+        "400":
+          description: Bad request.
+        "401":
+          description: Not Authorized.
+        "404":
+          description: Token not found.
+        "500":
+          description: Internal server error.
+      security:
+        - adminOidcAuth: [dlx.creator]
+        - adminOidcAuth: [dlx.admin]
+        - bearerAuth: [dlx.derive]
+    delete:
+      operationId: deleteToken
+      summary: Delete a DLX token link
+      description: Deletes a DLX token link and revokes access.
+      tags:
+        - DLX-Creator
+      parameters:
+        - in: path
+          name: token
+          description: Token value which identifies the DLX link.
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: DLX token link deleted successfully.
+        "401":
+          description: Not Authorized.
+        "404":
+          description: Token not found.
+        "500":
+          description: Internal server error.
+      security:
+        - adminOidcAuth: [dlx.creator]
+        - adminOidcAuth: [dlx.admin]
+        - bearerAuth: [dlx.derive]
+
+  /import:
+    post:
+      operationId: import
+      summary: Import data from an external DLX link
+      description: |
+        Triggers the import of data from an external DLX link (token) and immediately returns a response. The actual data transfer is processed asynchronously in the background. If the import completes within a short time (e.g., 10 seconds), a 200 response with the imported data is returned. If the import takes longer, a 202 response is returned, optionally including a statusUrl for tracking the import progress. The statusUrl allows the provider to supply a page or API endpoint for status updates; its usage is implementation-specific.
+      tags:
+        - DLX-Importer
+      requestBody:
+        description: Parameters for importing an external DLX link.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/importRequest'
+      responses:
+        "200":
+          description: Import completed. Metadata returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/importResponse'
+        "202":
+          description: Import started. Transfer initiated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/importResponse'
+        "400":
+          description: Bad request.
+        "401":
+          description: Not authorized.
+        "500":
+          description: Internal server error.
+      security:
+        - adminOidcAuth: [dlx.importer]
+        - adminOidcAuth: [dlx.admin]
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: JWT  # optional, for documentation purposes only
+      bearerFormat: JWT
+      description: |
+        JWT Bearer authentication for DLX-Consumer endpoints.
+        
+        The JWT may contain the following scopes:
+        - `dlx.consumer` - Access to download endpoints (/list, /download, /downloadall)
+        - `dlx.derive` - Additional access to create derived tokens via /tokens endpoint
+        
+        When using /tokens endpoints with bearerAuth, the JWT must contain `dlx.derive` scope.
 
+    # --- Proposal: Link Creation ---
+    adminOidcAuth:
+      type: openIdConnect
+      openIdConnectUrl: .well-known/openid-configuration
+      description: |
+        OpenID Connect (OIDC) authentication for DLX administrative operations (DLX-Creator and DLX-Importer).
+        The openIdConnectUrl is relative to the DLX server base path and resolves to
+        {apiBasePath}/.well-known/openid-configuration (e.g. /dlx/v1/.well-known/openid-configuration).
+        DLX-defined OAuth 2.0 scopes:
+        * `dlx.creator`  - Create and manage DLX token links (DLX-Creator endpoints)
+        * `dlx.importer` - Import data from external DLX links (DLX-Importer endpoints)
+        * `dlx.admin`    - Full administrative access; supersedes (includes dlx.creator and dlx.importer)
+
+  # --- Proposal: Capabilities ---
   schemas:
     apiInfo:
-      description: General information about the API and version.
+      description: General information about the API, version, and supported capabilities.
       type: object
       required:
         - dlxVersion
@@ -152,10 +496,46 @@ components:
               type: string
           apiBasePath:
               type: string
+          capabilities:
+              type: object
+              description: |
+                Indicates which optional features/endpoints are supported by this implementation. Example: { "download": true, "tokens": true, "import": false }
+              properties:
+                  download:
+                      type: boolean
+                      description: Whether the DLX-Consumer endpoints (token, list, download, downloadall, etc.) are supported.
+                  tokens:
+                      type: boolean
+                      description: Whether the /tokens endpoint is supported.
+                  import:
+                      type: boolean
+                      description: Whether the /import endpoint is supported.
+                  oidc:
+                      type: boolean
+                      description: Whether the .well-known/openid-configuration endpoint (scoped under the DLX base path) is supported for OIDC-based administrative authentication.
+                  derivation:
+                      type: boolean
+                      description: Whether token derivation is supported (creating derived tokens via /tokens endpoint with dlx.derive scope).
+                  dicomweb:
+                      $ref: '#/components/schemas/dicomwebCapabilities'
+              additionalProperties:
+                  type: object
       example:
-          dlxVersion: v1
+          dlxVersion: v2
           vendorInformation: DLX Company Ltd.
           apiBasePath: https://example.com/portal/dlx/v1
+          capabilities:
+              download: true
+              tokens: true
+              import: false
+              oidc: true
+              derivation: true
+              dicomweb:
+                  wadoRs:
+                      available: true
+                      url: https://example.com/dicomweb/wado-rs
+                  qidoRs:
+                      available: false
 
     tfaQuestions:
       description: Information about the API and list of tfa questions.
@@ -269,7 +649,7 @@ components:
         date:               # DICOM: studyDate (0008,0020)
           type: string
           format: date
-        modalities:         # DICOM: modality (0008,0060) resp. modalities​InStudy (0008,0061)
+        modalities:         # DICOM: modality (0008,0060) resp. modalitieInStudy (0008,0061)
           type: string
         patientsName:       # DICOM: patientsName (0010,0010)
           type: string
@@ -278,10 +658,16 @@ components:
           format: date
         patientsSex:        # DICOM: patientsSex (0010,0040)
           type: string
+        patientId:          # DICOM: patientID (0010,0020)
+          type: string
+        accessionNumber:    # DICOM: AccessionNumber (0008,0050)
+          type: string
         fileCount:          # number of files in a ZIP container
           type: integer
       example:
         - id: ee26fd29-fdcb-469d-a4f7-7c6de8607f71
+          patientId: PID123
+          accessionNumber: ACC456
           mimeType: application/pdf
           description: Radiological report
           date: 20240419
@@ -289,6 +675,8 @@ components:
           patientsBirthdate: 19700101
           patientsSex: M
         - id: 2de7773a-09df-46f1-98fb-9eeaaaeba802
+          patientId: PID123
+          accessionNumber: ACC456
           mimeType: application/zip
           description: DICOM Study as ZIP file
           studyInstanceUID: 1.2.276.0.23.60.1.2.14841915742092284318.1713520221786.0
@@ -309,6 +697,300 @@ components:
       example:
         timeOutInSeconds: 30
 
+    # --- Proposal: Link Creation ---
+    tfaInfo:
+      description: Information about the API and list of all tfa questions.
+      type: object
+      properties: 
+        apiInfo:
+          type: array
+          items:
+            $ref: '#/components/schemas/apiInfo'
+        tfaQuestion:
+          type: array
+          items:
+            $ref: '#/components/schemas/tfaQuestion'   
+    tokensRequest:
+      type: object
+      required:
+        - patientId
+      description: Request payload for creating a DLX download link for one or more studies.
+      properties:
+        patientId:
+          type: string
+          description: Unique identifier of the patient (e.g., from DICOM tag PatientID (0010,0020)).
+        studyInstanceUids:
+          type: array
+          description: List of Study Instance UIDs (DICOM tag StudyInstanceUID (0020,000D)) that should be included in the download link.
+          items:
+            type: string
+        accessionNumbers:
+          type: array
+          description: List of accession numbers (DICOM tag AccessionNumber (0008,0050)) that should be included in the download link.
+          items:
+            type: string
+        expiresAt:
+          $ref: '#/components/schemas/dateTime'
+        tfaAnswer:
+          type: array
+          items:
+            $ref: '#/components/schemas/tfaAnswer'
+        allowDerivation:
+          type: boolean
+          default: false
+          description: Whether the created token can create further derived tokens. Only applicable when creating tokens via adminOidcAuth or when the creating token has dlx.derive scope.
+      example:
+        patientId: PID123
+        studyInstanceUids:
+          - "1.2.276.0.23.60.1.2.14841915742092284318.1713520221786.0"
+        expiresAt: "2022-03-10T16:15:50Z"
+        tfaAnswer:
+          - questionId: "1"
+            answer: "19700101"
+        allowDerivation: true
+    tokensResponse:
+      description: Requested Link with Token and second factor.
+      type: object
+      required:
+        - link
+        - issuer
+        - issuedAt
+        - expiresAt
+        - token
+        - tfaAnswer
+      properties:
+        link:
+          type: string
+        issuer:
+          type: string
+        issuedAt:
+          $ref: '#/components/schemas/dateTime'
+        expiresAt:
+          $ref: '#/components/schemas/dateTime'
+        token:
+          type: string
+        tfaAnswer:
+          type: array
+          items:
+            $ref: '#/components/schemas/tfaAnswer'
+        dataItems:
+          $ref: '#/components/schemas/dataItems'
+        allowDerivation:
+          type: boolean
+          description: Whether this token can create derived tokens via the /tokens endpoint.
+        parentToken:
+          type: string
+          description: Parent token value if this is a derived token. Only present for derived tokens.
+      example:
+        link: https://www.example.dlx/dlx/v1/token/ABC-S1Z-98A
+        issuer: Example Hospital
+        issuedAt: 2022-02-10T16:15:50Z
+        expiresAt: 2022-03-10T16:15:50Z
+        token: ABC-S1Z-98A
+        tfaAnswer:
+          - questionId: "1"
+            answer: "19700101"
+        allowDerivation: true
+        dataItems:
+          dataItem:
+            - id: ee26fd29-fdcb-469d-a4f7-7c6de8607f71
+              patientId: PID123
+              accessionNumber: ACC456
+              mimeType: application/pdf
+              description: Radiological report
+              date: 20240419
+              patientsName: Mustermann,Max
+              patientsBirthdate: 19700101
+              patientsSex: M
+
+    # --- Proposal: Pagination ---
+    paginatedTokensResponse:
+      description: |
+        Paginated list of DLX token links. Pagination follows RFC 8288 (Web Linking) semantics.
+      type: object
+      required:
+        - totalItems
+        - page
+        - pageSize
+        - items
+      properties:
+        totalItems:
+          type: integer
+          minimum: 0
+          description: Total number of token links available.
+        page:
+          type: integer
+          minimum: 1
+          description: Current page number (1-indexed).
+        pageSize:
+          type: integer
+          minimum: 1
+          description: Number of items per page.
+        items:
+          type: array
+          description: List of token links for the current page.
+          items:
+            $ref: '#/components/schemas/tokensResponse'
+      example:
+        totalItems: 42
+        page: 1
+        pageSize: 20
+        items:
+          - link: https://www.example.dlx/dlx/v1/token/ABC-S1Z-98A
+            issuer: Example Hospital
+            issuedAt: 2022-02-10T16:15:50Z
+            expiresAt: 2022-03-10T16:15:50Z
+            token: ABC-S1Z-98A
+            tfaAnswer:
+              - questionId: "1"
+                answer: "19700101"
+            allowDerivation: false
+            dataItems:
+              dataItem:
+                - id: ee26fd29-fdcb-469d-a4f7-7c6de8607f71
+                  patientId: PID123
+                  accessionNumber: ACC456
+                  mimeType: application/pdf
+                  description: Radiological report
+                  date: 20240419
+                  patientsName: Mustermann,Max
+                  patientsBirthdate: 19700101
+                  patientsSex: M
+                - id: 2de7773a-09df-46f1-98fb-9eeaaaeba802
+                  patientId: PID123
+                  accessionNumber: ACC456
+                  mimeType: application/zip
+                  description: DICOM Study as ZIP file
+                  studyInstanceUID: 1.2.276.0.23.60.1.2.14841915742092284318.1713520221786.0
+                  date: 20240419
+                  modalities: OT
+                  patientsName: Mustermann,Max
+                  patientsBirthdate: 19700101
+                  patientsSex: M
+                  fileCount: 3
+          - link: https://www.example.dlx/dlx/v1/token/DER-IV8-42X
+            issuer: Example Hospital
+            issuedAt: 2022-02-11T10:00:00Z
+            expiresAt: 2022-03-11T10:00:00Z
+            token: DER-IV8-42X
+            tfaAnswer:
+              - questionId: "1"
+                answer: "19850315"
+            allowDerivation: true
+            dataItems:
+              dataItem: []
+          - link: https://www.example.dlx/dlx/v1/token/CHD-1LD-77Y
+            issuer: Example Hospital
+            issuedAt: 2022-02-12T14:30:00Z
+            expiresAt: 2022-02-20T14:30:00Z
+            token: CHD-1LD-77Y
+            tfaAnswer:
+              - questionId: "1"
+                answer: "19700101"
+            allowDerivation: false
+            parentToken: DER-IV8-42X
+            dataItems:
+              dataItem:
+                - id: ee26fd29-fdcb-469d-a4f7-7c6de8607f71
+                  patientId: PID123
+                  accessionNumber: ACC456
+                  mimeType: application/pdf
+                  description: Radiological report
+                  date: 20240419
+                  patientsName: Mustermann,Max
+                  patientsBirthdate: 19700101
+                  patientsSex: M
+
+    # --- Proposal: Link Import ---
+    importRequest:
+      type: object
+      required:
+        - link
+        - token
+        - tfaAnswer
+      description: Request to import an external DLX link.
+      properties:
+        link:
+          type: string
+          description: External DLX link (URL).
+        token:
+          type: string
+          description: Token value from the external DLX link.
+        tfaAnswer:
+          type: array
+          items:
+            $ref: '#/components/schemas/tfaAnswer'
+          description: Answers to TFA questions.
+    importResponse:
+      type: object
+      description: Response with status and metadata about the import.
+      properties:
+        status:
+          type: string
+          description: Status of the import. Possible values started, completed, error, partial.
+          enum:
+            - started
+            - completed
+            - error
+            - partial
+        statusUrl:
+          type: string
+          description: Optional URL to a status page where users can track the import progress (implementation-specific).
+        importedItems:
+          $ref: '#/components/schemas/dataItems'
+        message:
+          type: string
+          description: Optional status or error message.
+
+    dateTime:
+      description: Date and time in ISO 8601 format (e.g., 2022-03-10T16:15:50Z).
+      format: date-time
+      type: string
+      example: 2022-03-10T16:15:50Z
+
+    dicomwebCapabilities:
+      type: object
+      description: |
+        DLX-specific DICOMweb capabilities structure.
+        Describes which DICOMweb services are available and their endpoints.
+        The DLX bearer token SHOULD be accepted for authentication at these endpoints,
+        limited to the studyInstanceUids the token was issued for.
+        See DICOM PS3.18 for DICOMweb specification.
+      properties:
+        wadoRs:
+          type: object
+          description: |
+            WADO-RS (DICOMweb Retrieve) capability.
+            See DICOM PS3.18 Section 10.4 for specification.
+          properties:
+            available:
+              type: boolean
+              default: false
+              description: Whether WADO-RS is available.
+            url:
+              type: string
+              format: uri
+              description: |
+                Base URL for WADO-RS endpoints (absolute).
+                Required when available=true.
+                Example: https://example.com/dicomweb/wado-rs
+        qidoRs:
+          type: object
+          description: |
+            QIDO-RS (DICOMweb Query) capability.
+            See DICOM PS3.18 Section 10.6 for specification.
+          properties:
+            available:
+              type: boolean
+              default: false
+              description: Whether QIDO-RS is available.
+            url:
+              type: string
+              format: uri
+              description: Base URL for QIDO-RS endpoints (absolute).
+      additionalProperties:
+        type: object
+
   responses:
     invalidCredentials:
       description: Invalid credentials provided - use /token and /tokentfa before.
@@ -322,3 +1004,39 @@ components:
 
     invalidDataItemId:
       description: Study or report for the given ID is unknown.
+
+    derivationNotAllowed:
+      description: Token derivation is not allowed. The token does not have the dlx.derive scope or derivation is not enabled for this token.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "derivation_not_allowed"
+
+    derivationExceedsParent:
+      description: Derived token cannot exceed parent token's constraints (e.g., expiration date exceeds parent's expiration, study UIDs not subset of parent's allowed UIDs).
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              details:
+                type: string
+            example:
+              error: "derivation_exceeds_parent"
+              details: "expiresAt cannot exceed 2024-03-10T16:15:50Z"
+
+tags:
+  - name: DLX-Consumer
+    description: APIs used to download and access medical data via DLX token links.
+  - name: DLX-Creator
+    description: APIs used to create and manage DLX token links.
+  - name: DLX-Importer
+    description: APIs used to import and transfer data from external DLX token links.    
+  - name: Info
+    description: Provides information on version and implemented capabilities of the API
