@@ -10,21 +10,29 @@ Die **DLX API** (DICOM Link Exchange) ist eine Initiative von Herstellern medizi
 ## Hauptmerkmale
 
 - 🔐 **Zwei-Faktor-Authentifizierung (TFA)** für sicheren Patienten-Zugriff
-- 🔑 **OpenID Connect (OIDC)** für administrative Zugriffe
-- 📦 **IHE PDI konforme** DICOM-Downloads
-- 🔄 **Import-Funktionalität** für externen Datenaustausch
+- � **IHE PDI konforme** DICOM-Downloads
 - 🌳 **Token Derivation** für eingeschränkte Untertokens
 - 🏥 **DICOMweb-Integration** für WADO-RS und QIDO-RS Zugriff
 
 ## API-Rollen
 
-Die DLX API unterscheidet drei Hauptrollen:
+Die DLX API unterscheidet zwei Hauptrollen:
 
 | Rolle | Beschreibung | Authentifizierung |
 |-------|--------------|-------------------|
 | **DLX-Consumer** | Patienten/Ärzte, die Daten über Token-Links herunterladen | TFA → JWT |
-| **DLX-Creator** | Administratoren, die Token-Links erstellen und verwalten | OIDC (Scope: `dlx.creator`) |
-| **DLX-Importer** | Systeme, die Daten von externen DLX-Instanzen importieren | OIDC (Scope: `dlx.importer`) |
+| **DLX-Creator** | Benutzer/Admins, die Token-Links erstellen und verwalten | JWT (Scope: `dlx.derive`) |
+
+**JWT Scopes:**
+
+| Scope | Beschreibung |
+|-------|--------------|
+| `dlx.consumer` | Zugriff auf Download-Endpunkte (/list, /download, /downloadall) |
+| `dlx.derive` | Token-Links erstellen und verwalten (DLX-Creator Endpunkte) |
+
+**Wichtige Hinweise:**
+- Der `dlx.derive` Scope wird nur vergeben, wenn der erstellende Token mit `allowDerivation: true` erstellt wurde
+- Bei Verwendung von bearerAuth für DLX-Creator Endpunkte müssen die erstellten/aktualisierten Token ein Subset der erstellenden Token-Berechtigungen sein (expiresAt nicht später, weniger Datenobjekte)
 
 ---
 
@@ -45,26 +53,20 @@ Patienten oder Ärzte erhalten einen Token-Link (z.B. per E-Mail oder QR-Code) u
 
 ### DLX-Creator Workflow
 
-Administratoren erstellen Token-Links für Patienten, um diesen Zugriff auf ihre medizinischen Daten zu gewähren.
+Benutzer/Admins erstellen Token-Links für Patienten, um diesen Zugriff auf ihre medizinischen Daten zu gewähren.
 
 ![DLX-Creator Workflow](workflow-creator.png)
 
 **Schritte:**
-1. **OIDC-Login**: Authentifizierung mit `dlx.creator` Scope
+1. **JWT mit dlx.derive Scope**: Token muss `allowDerivation: true` haben
 2. **Token erstellen**: `POST /tokens` mit Patienten- und Studiendaten
 3. **TFA konfigurieren**: Optional Sicherheitsfragen definieren
 4. **Link versenden**: Token-Link an Patienten senden
 
-### DLX-Importer Workflow
-
-Systeme importieren Daten von externen DLX-Instanzen (z.B. andere Krankenhäuser).
-
-![DLX-Importer Workflow](workflow-importer.png)
-
-**Schritte:**
-1. **OIDC-Login**: Authentifizierung mit `dlx.importer` Scope
-2. **Import anstoßen**: `POST /import` mit externem Link und TFA-Daten
-3. **Daten empfangen**: Synchron (200) oder asynchron (202)
+**Wichtige Hinweise:**
+- Bei Verwendung von bearerAuth für DLX-Creator Endpunkte müssen die erstellten Token ein Subset der erstellenden Token-Berechtigungen sein
+- `expiresAt` darf nicht über die Gültigkeit des erstellenden Tokens hinausgehen
+- Die Datenobjekte (Studien) können eingeschränkt werden (weniger Studien als Eltern-Token)
 
 ### DICOMweb WADO-RS Workflow
 
@@ -92,7 +94,7 @@ DLX-Consumer mit `dlx.derive` Scope können eingeschränkte Untertokens für Dri
 **Schritte:**
 1. **TFA-Authentifizierung**: Normaler DLX-Consumer Workflow
 2. **JWT mit dlx.derive Scope**: Token muss `allowDerivation: true` haben
-3. **Untertoken erstellen**: `POST /tokens` mit Bearer-Token (nicht OIDC)
+3. **Untertoken erstellen**: `POST /tokens` mit Bearer-Token
 4. **Eingeschränkter Zugriff**: Untertoken kann nur Subset der Eltern-Studien und kürzere Gültigkeit haben
 
 **Einschränkungen für abgeleitete Tokens:**
@@ -109,7 +111,6 @@ DLX-Consumer mit `dlx.derive` Scope können eingeschränkte Untertokens für Dri
 | Endpunkt | Methode | Beschreibung |
 |----------|---------|--------------|
 | `/api_info` | GET | API-Version und unterstützte Capabilities |
-| `/.well-known/openid-configuration` | GET | OIDC Discovery Document |
 | `/tfa_info` | GET | Unterstützte TFA-Optionen (authentifiziert) |
 
 ### DLX-Consumer Endpunkte
@@ -126,19 +127,19 @@ DLX-Consumer mit `dlx.derive` Scope können eingeschränkte Untertokens für Dri
 
 | Endpunkt | Methode | Auth | Beschreibung |
 |----------|---------|------|--------------|
-| `/tokens` | GET | OIDC / JWT¹ | Alle Token-Links auflisten (paginiert) |
-| `/tokens` | POST | OIDC / JWT¹ | Neuen Token-Link erstellen |
-| `/tokens/{token}` | GET | OIDC / JWT¹ | Token-Link-Details abrufen |
-| `/tokens/{token}` | PUT | OIDC / JWT¹ | Token-Link aktualisieren |
-| `/tokens/{token}` | DELETE | OIDC / JWT¹ | Token-Link löschen |
+| `/tokens` | GET | JWT¹ | Alle Token-Links auflisten (paginiert) |
+| `/tokens` | POST | JWT¹ | Neuen Token-Link erstellen |
+| `/tokens/{token}` | GET | JWT¹ | Token-Link-Details abrufen |
+| `/tokens/{token}` | PUT | JWT¹ | Token-Link aktualisieren |
+| `/tokens/{token}` | DELETE | JWT¹ | Token-Link löschen |
 
 ¹ JWT mit `dlx.derive` Scope für Token Derivation (nur eigene abgeleitete Tokens)
 
-#### Token mit Derivation erstellen (OIDC)
+#### Token mit Derivation erstellen
 
 ```json
 POST /tokens
-Authorization: Bearer {oidc_access_token}
+Authorization: Bearer {jwt_with_dlx_derive_scope}
 
 {
   "patientId": "PID123",
@@ -160,6 +161,12 @@ Authorization: Bearer {oidc_access_token}
   "tfaAnswer": [...]
 }
 ```
+
+**Wichtige Hinweise:**
+- Der `dlx.derive` Scope wird nur vergeben, wenn der erstellende Token mit `allowDerivation: true` erstellt wurde
+- Bei Verwendung von bearerAuth für DLX-Creator Endpunkte müssen die erstellten Token ein Subset der erstellenden Token-Berechtigungen sein
+- `expiresAt` darf nicht über die Gültigkeit des erstellenden Tokens hinausgehen
+- Die Datenobjekte (Studien) können eingeschränkt werden (weniger Studien als Eltern-Token)
 
 #### Abgeleiteten Token erstellen (JWT mit dlx.derive)
 
@@ -188,12 +195,6 @@ Authorization: Bearer {jwt_with_dlx_derive_scope}
   "tfaAnswer": [...]
 }
 ```
-
-### DLX-Importer Endpunkte
-
-| Endpunkt | Methode | Auth | Beschreibung |
-|----------|---------|------|--------------|
-| `/import` | POST | OIDC | Daten von externem DLX importieren |
 
 ---
 
@@ -230,10 +231,11 @@ Authorization: Bearer {jwt_with_dlx_derive_scope}
 | Scope | Beschreibung |
 |-------|--------------|
 | `dlx.consumer` | Zugriff auf Download-Endpunkte (/list, /download, /downloadall) |
-| `dlx.derive` | Eingeschränkte Untertokens erstellen (Token Derivation) |
-| `dlx.creator` | Token-Links erstellen und verwalten |
-| `dlx.importer` | Externe DLX-Daten importieren |
-| `dlx.admin` | Vollständiger administrativer Zugriff (inkl. creator + importer) |
+| `dlx.derive` | Token-Links erstellen und verwalten (DLX-Creator Endpunkte) |
+
+**Wichtige Hinweise:**
+- Der `dlx.derive` Scope wird nur vergeben, wenn der erstellende Token mit `allowDerivation: true` erstellt wurde
+- Bei Verwendung von bearerAuth für DLX-Creator Endpunkte müssen die erstellten/aktualisierten Token ein Subset der erstellenden Token-Berechtigungen sein
 
 ---
 
@@ -260,8 +262,6 @@ Die `/api_info`-Endpunkt gibt Auskunft über unterstützte Features:
   "capabilities": {
     "download": true,
     "tokens": true,
-    "import": false,
-    "oidc": true,
     "derivation": true,
     "dicomweb": {
       "wadoRs": {
@@ -280,8 +280,6 @@ Die `/api_info`-Endpunkt gibt Auskunft über unterstützte Features:
 |------------|--------------|
 | `download` | DLX-Consumer Endpunkte verfügbar |
 | `tokens` | DLX-Creator Endpunkte verfügbar |
-| `import` | DLX-Importer Endpunkte verfügbar |
-| `oidc` | OIDC Discovery verfügbar |
 | `derivation` | Token Derivation unterstützt (dlx.derive Scope) |
 | `dicomweb` | DICOMweb-Dienste (WADO-RS, QIDO-RS) verfügbar |
 
@@ -364,8 +362,7 @@ npx swagger-ui-watcher openapi.yaml
 
 ## Weitere Informationen
 
-- **OpenAPI Spezifikation**: [`openapi.yaml`](openapi.yaml)
-- **OIDC Discovery 1.0**: https://openid.net/specs/openid-connect-discovery-1_0.html
+- **OpenAPI Spezifikation**: [`dicomLinkExchange.yaml`](dicomLinkExchange.yaml)
 - **IHE PDI Profile**: https://www.ihe.net/resources/profiles/
 
 ---
