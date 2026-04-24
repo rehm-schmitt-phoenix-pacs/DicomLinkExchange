@@ -15,6 +15,8 @@ paths:
     get:
       tags:
       - DLX-Info
+      - DLX-ConsumerRole
+      - DLX-ManagementRole
       responses:
         "200":
           description: A JSON string representing information about the API.
@@ -28,6 +30,7 @@ paths:
     get:
       tags:
         - DLX-Download
+        - DLX-ConsumerRole
       parameters:
         - in: header
           name: X-DICOM-LINK-EXCHANGE # optional, and used to activate the DLX API functionality
@@ -52,6 +55,7 @@ paths:
     post:
       tags:
         - DLX-Download
+        - DLX-ConsumerRole
       parameters:
         - in: path
           name: value
@@ -82,6 +86,7 @@ paths:
     get:
       tags:
         - DLX-Download
+        - DLX-ConsumerRole
       security:
         - bearerAuth: []
       responses:
@@ -99,6 +104,7 @@ paths:
     get:
       tags:
         - DLX-Download
+        - DLX-ConsumerRole
       security:
         - bearerAuth: []
       parameters:
@@ -128,6 +134,7 @@ paths:
     get:
       tags:
         - DLX-Download
+        - DLX-ConsumerRole
       security:
         - bearerAuth: []
       responses:
@@ -162,8 +169,7 @@ paths:
         API key, etc.). The schema below shows a common example but implementations 
         may define their own fields.
       tags:
-        - DLX-TokenManagement
-        - DLX-Import
+        - DLX-ManagementRole
       requestBody:
         required: true
         description: |
@@ -200,6 +206,8 @@ paths:
       tags:
         - DLX-TokenManagement
         - DLX-Info
+        - DLX-ManagementRole
+        - DLX-ConsumerRole
       security:
         - adminBearerAuth: [dlx.tokenmanagement]
       responses:
@@ -230,6 +238,8 @@ paths:
         - The allowDerivation flag cannot be set to true unless the creating token has derivation enabled
       tags:
         - DLX-TokenManagement
+        - DLX-ManagementRole
+        - DLX-ConsumerRole
       requestBody:
         description: Parameters for creating a DLX download link.
         content:
@@ -264,6 +274,8 @@ paths:
         The dlx.derive scope is only granted when the creating token was created with allowDerivation set to true.
       tags:
         - DLX-TokenManagement
+        - DLX-ManagementRole
+        - DLX-ConsumerRole
       parameters:
         - in: query
           name: page
@@ -341,6 +353,8 @@ paths:
         The dlx.derive scope is only granted when the creating token was created with allowDerivation set to true.
       tags:
         - DLX-TokenManagement
+        - DLX-ManagementRole
+        - DLX-ConsumerRole
       parameters:
         - in: path
           name: token
@@ -378,6 +392,8 @@ paths:
         - The allowDerivation flag cannot be set to true unless the creating token has derivation enabled
       tags:
         - DLX-TokenManagement
+        - DLX-ManagementRole
+        - DLX-ConsumerRole
       parameters:
         - in: path
           name: token
@@ -419,6 +435,8 @@ paths:
         The dlx.derive scope is only granted when the creating token was created with allowDerivation set to true.
       tags:
         - DLX-TokenManagement
+        - DLX-ManagementRole
+        - DLX-ConsumerRole
       parameters:
         - in: path
           name: token
@@ -447,6 +465,7 @@ paths:
         Triggers the import of data from an external DLX link (token) and immediately returns a response. The actual data transfer is processed asynchronously in the background. If the import completes within a short time (e.g., 10 seconds), a 200 response with the imported data is returned. If the import takes longer, a 202 response is returned, optionally including a statusUrl for tracking the import progress. The statusUrl allows the provider to supply a page or API endpoint for status updates; its usage is implementation-specific.
       tags:
         - DLX-Import
+        - DLX-ManagementRole
       requestBody:
         description: Parameters for importing an external DLX link.
         content:
@@ -1104,6 +1123,16 @@ tags:
   - name: DLX-TokenManagement
     description: APIs used to manage DLX token links.
   - name: DLX-Import
-    description: APIs used to import and transfer data from external DLX token links.    
+    description: APIs used to import and transfer data from external DLX token links.
+  - name: DLX-ConsumerRole
+    description: |-
+      Endpoints accessible via TFA authentication (/token → /tokentfa → JWT).
+      Scopes: dlx.derive.
+  - name: DLX-ManagementRole
+    description: |-
+      Endpoints accessible via admin authentication (/admin_auth → JWT).
+      Scopes: dlx.tokenmanagement, dlx.import.
+      Note: Some endpoints (e.g. /tokens CRUD) support both DLX-ConsumerRole and DLX-ManagementRole
+      but use different authentication methods (TFA vs /admin_auth).
   - name: DLX-Info
     description: Provides information on version and implemented capabilities of the API
