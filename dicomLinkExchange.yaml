@@ -724,7 +724,7 @@ components:
         date:               # DICOM: studyDate (0008,0020)
           type: string
           format: date
-        modalities:         # DICOM: modality (0008,0060) resp. modalitieInStudy (0008,0061)
+        modalities:         # DICOM: modality (0008,0060) resp. modalitiesInStudy (0008,0061)
           type: string
         patientsName:       # DICOM: patientsName (0010,0010)
           type: string
