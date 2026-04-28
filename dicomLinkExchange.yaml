@@ -15,8 +15,8 @@ paths:
     get:
       tags:
       - DLX-Info
-      - DLX-ConsumerRole
-      - DLX-ManagementRole
+      - DLX-ConsumerContext
+      - DLX-ManagementContext
       responses:
         "200":
           description: A JSON string representing information about the API.
@@ -30,7 +30,7 @@ paths:
     get:
       tags:
         - DLX-Download
-        - DLX-ConsumerRole
+        - DLX-ConsumerContext
       parameters:
         - in: header
           name: X-DICOM-LINK-EXCHANGE # optional, and used to activate the DLX API functionality
@@ -55,7 +55,7 @@ paths:
     post:
       tags:
         - DLX-Download
-        - DLX-ConsumerRole
+        - DLX-ConsumerContext
       parameters:
         - in: path
           name: value
@@ -86,7 +86,7 @@ paths:
     get:
       tags:
         - DLX-Download
-        - DLX-ConsumerRole
+        - DLX-ConsumerContext
       security:
         - bearerAuth: []
       responses:
@@ -104,7 +104,7 @@ paths:
     get:
       tags:
         - DLX-Download
-        - DLX-ConsumerRole
+        - DLX-ConsumerContext
       security:
         - bearerAuth: []
       parameters:
@@ -134,7 +134,7 @@ paths:
     get:
       tags:
         - DLX-Download
-        - DLX-ConsumerRole
+        - DLX-ConsumerContext
       security:
         - bearerAuth: []
       responses:
@@ -153,7 +153,7 @@ paths:
   # --- Proposal: Link Creation ---
   /admin_auth:
     description: |
-      Endpoint to authenticate with administrative credentials (e.g. for DLX-TokenManagement or DLX-Import operations) and receive a JWT for bearer authentication in subsequent requests. The JWT must contain the appropriate scopes (dlx.tokenmanagement or dlx.import) to access the respective endpoints.
+      Endpoint to authenticate with administrative credentials (e.g. for DLX-Tokens or DLX-Import operations) and receive a JWT for bearer authentication in subsequent requests. The JWT must contain the appropriate scopes (dlx.tokens or dlx.import) to access the respective endpoints.
       The authentication method (e.g. username/password, client certificate, etc.) is implementation-specific and not defined by the API specification. The request and response formats are also flexible to allow for different authentication methods, but a common approach is to use a JSON payload for the request and return the JWT in a JSON response.
     post:
       operationId: adminAuth
@@ -161,7 +161,7 @@ paths:
       description: |
         Authenticates the user with administrative credentials and returns a JWT 
         for bearer authentication in subsequent requests. The JWT must contain 
-        the appropriate scopes (dlx.tokenmanagement, dlx.import) to 
+        the appropriate scopes (dlx.tokens, dlx.import) to 
         access the respective endpoints.
         
         The request payload is implementation-specific. Implementations may 
@@ -169,7 +169,7 @@ paths:
         API key, etc.). The schema below shows a common example but implementations 
         may define their own fields.
       tags:
-        - DLX-ManagementRole
+        - DLX-ManagementContext
       requestBody:
         required: true
         description: |
@@ -187,7 +187,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/adminAuthResponse'
         "400":
-          description: Bad request. Malformed or missing credentials.
+          description: Bad request.
         "401":
           description: Authentication failed. Invalid credentials.
         "500":
@@ -204,12 +204,12 @@ paths:
         To use this endpoint with bearerAuth, the JWT must contain the dlx.derive scope.
         The dlx.derive scope is only granted when the creating token was created with allowDerivation set to true.
       tags:
-        - DLX-TokenManagement
+        - DLX-Tokens
         - DLX-Info
-        - DLX-ManagementRole
-        - DLX-ConsumerRole
+        - DLX-ManagementContext
+        - DLX-ConsumerContext
       security:
-        - adminBearerAuth: [dlx.tokenmanagement]
+        - adminBearerAuth: [dlx.tokens]
       responses:
         "200":
           description: Supported TFA options returned successfully.
@@ -237,9 +237,9 @@ paths:
         - The data items (studies) cannot exceed those allowed by the creating token
         - The allowDerivation flag cannot be set to true unless the creating token has derivation enabled
       tags:
-        - DLX-TokenManagement
-        - DLX-ManagementRole
-        - DLX-ConsumerRole
+        - DLX-Tokens
+        - DLX-ManagementContext
+        - DLX-ConsumerContext
       requestBody:
         description: Parameters for creating a DLX download link.
         content:
@@ -256,9 +256,9 @@ paths:
         "400":
           description: Bad request.
         "401":
-          description: Not Authorized.
+          description: Not authorized.
         "403":
-          description: Not Allowed.
+          description: Not allowed.
         "500":
           description: Internal server error.
       security:
@@ -273,9 +273,9 @@ paths:
         To use this endpoint with bearerAuth, the JWT must contain the dlx.derive scope.
         The dlx.derive scope is only granted when the creating token was created with allowDerivation set to true.
       tags:
-        - DLX-TokenManagement
-        - DLX-ManagementRole
-        - DLX-ConsumerRole
+        - DLX-Tokens
+        - DLX-ManagementContext
+        - DLX-ConsumerContext
       parameters:
         - in: query
           name: page
@@ -340,7 +340,7 @@ paths:
         "500":
           description: Internal server error.
       security:
-        - adminBearerAuth: [dlx.tokenmanagement]
+        - adminBearerAuth: [dlx.tokens]
         - bearerAuth: [dlx.derive]
   /tokens/{token}:
     get:
@@ -352,9 +352,9 @@ paths:
         To use this endpoint with bearerAuth, the JWT must contain the dlx.derive scope.
         The dlx.derive scope is only granted when the creating token was created with allowDerivation set to true.
       tags:
-        - DLX-TokenManagement
-        - DLX-ManagementRole
-        - DLX-ConsumerRole
+        - DLX-Tokens
+        - DLX-ManagementContext
+        - DLX-ConsumerContext
       parameters:
         - in: path
           name: token
@@ -376,7 +376,7 @@ paths:
         "500":
           description: Internal server error.
       security:
-        - adminBearerAuth: [dlx.tokenmanagement]
+        - adminBearerAuth: [dlx.tokens]
         - bearerAuth: [dlx.derive]
     put:
       operationId: updateToken
@@ -391,9 +391,9 @@ paths:
         - The data items (studies) cannot exceed those allowed by the creating token
         - The allowDerivation flag cannot be set to true unless the creating token has derivation enabled
       tags:
-        - DLX-TokenManagement
-        - DLX-ManagementRole
-        - DLX-ConsumerRole
+        - DLX-Tokens
+        - DLX-ManagementContext
+        - DLX-ConsumerContext
       parameters:
         - in: path
           name: token
@@ -417,13 +417,13 @@ paths:
         "400":
           description: Bad request.
         "401":
-          description: Not Authorized.
+          description: Not authorized.
         "404":
           description: Token not found.
         "500":
           description: Internal server error.
       security:
-        - adminBearerAuth: [dlx.tokenmanagement]
+        - adminBearerAuth: [dlx.tokens]
         - bearerAuth: [dlx.derive]
     delete:
       operationId: deleteToken
@@ -434,9 +434,9 @@ paths:
         To use this endpoint with bearerAuth, the JWT must contain the dlx.derive scope.
         The dlx.derive scope is only granted when the creating token was created with allowDerivation set to true.
       tags:
-        - DLX-TokenManagement
-        - DLX-ManagementRole
-        - DLX-ConsumerRole
+        - DLX-Tokens
+        - DLX-ManagementContext
+        - DLX-ConsumerContext
       parameters:
         - in: path
           name: token
@@ -454,7 +454,7 @@ paths:
         "500":
           description: Internal server error.
       security:
-        - adminBearerAuth: [dlx.tokenmanagement]
+        - adminBearerAuth: [dlx.tokens]
         - bearerAuth: [dlx.derive]
 
   /import:
@@ -465,7 +465,7 @@ paths:
         Triggers the import of data from an external DLX link (token) and immediately returns a response. The actual data transfer is processed asynchronously in the background. If the import completes within a short time (e.g., 10 seconds), a 200 response with the imported data is returned. If the import takes longer, a 202 response is returned, optionally including a statusUrl for tracking the import progress. The statusUrl allows the provider to supply a page or API endpoint for status updates; its usage is implementation-specific.
       tags:
         - DLX-Import
-        - DLX-ManagementRole
+        - DLX-ManagementContext
       requestBody:
         description: Parameters for importing an external DLX link.
         content:
@@ -514,10 +514,10 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: |
-        JWT Bearer authentication for DLX administrative operations (DLX-TokenManagement and DLX-Import).
+        JWT Bearer authentication for DLX administrative operations (DLX-Tokens and DLX-Import).
         The JWT may contain the following scopes:
 
-        * `dlx.tokenmanagement`  - Create and manage DLX token links (DLX-TokenManagement endpoints)
+        * `dlx.tokens`  - Create and manage DLX token links (DLX-Tokens endpoints)
         * `dlx.import` - Import data from external DLX links (DLX-Import endpoints)
 
   # --- Proposal: Capabilities ---
@@ -541,13 +541,13 @@ components:
           type: string
           description: |
             Requested OAuth 2.0 scope(s). Space-separated list of:
-            - dlx.tokenmanagement  - Manage DLX token links
+            - dlx.tokens  - Manage DLX token links
             - dlx.import - Import data from external DLX links
-            Example: "dlx.tokenmanagement" or "dlx.tokenmanagement dlx.import"
+            Example: "dlx.tokens" or "dlx.tokens dlx.import"
       example:
         username: "admin"
         password: "secret"
-        scope: "dlx.tokenmanagement"
+        scope: "dlx.tokens"
 
     adminAuthResponse:
       type: object
@@ -568,10 +568,14 @@ components:
         refresh_token:
           type: string
           description: Optional refresh token to obtain a new access token after expiration.
+        scope:
+          type: string
+          description: The scope(s) granted to the access token. Space-separated list of scopes (e.g. "dlx.tokens dlx.import").
       example:
         access_token: "eyJhbGciOiJSUzI1NiIs..."
         token_type: Bearer
         expires_in: 3600
+        scope: "dlx.tokens"
 
     apiInfo:
       description: General information about the API, version, and supported capabilities.
@@ -824,7 +828,7 @@ components:
         allowDerivation:
           type: boolean
           default: false
-          description: Whether the created token can create further derived tokens. When set to true, the token can be used to access DLX-TokenManagement endpoints via bearerAuth with the dlx.derive scope.
+          description: Whether the created token can create further derived tokens. When set to true, the token can be used to access DLX-Tokens endpoints via bearerAuth with the dlx.derive scope.
       example:
         patientId: PID123
         studyInstanceUids:
@@ -863,7 +867,7 @@ components:
           $ref: '#/components/schemas/dataItems'
         allowDerivation:
           type: boolean
-          description: Whether this token can create derived tokens via the /tokens endpoint. When true, the token can be used to access DLX-TokenManagement endpoints via bearerAuth with the dlx.derive scope.
+          description: Whether this token can create derived tokens via the /tokens endpoint. When true, the token can be used to access DLX-Tokens endpoints via bearerAuth with the dlx.derive scope.
         parentToken:
           type: string
           description: Parent token value if this is a derived token. Only present for derived tokens.
@@ -1120,19 +1124,19 @@ components:
 tags:
   - name: DLX-Download
     description: APIs used to download and access medical data via DLX token links.
-  - name: DLX-TokenManagement
+  - name: DLX-Tokens
     description: APIs used to manage DLX token links.
   - name: DLX-Import
     description: APIs used to import and transfer data from external DLX token links.
-  - name: DLX-ConsumerRole
+  - name: DLX-ConsumerContext
     description: |-
       Endpoints accessible via TFA authentication (/token → /tokentfa → JWT).
       Scopes: dlx.derive.
-  - name: DLX-ManagementRole
+  - name: DLX-ManagementContext
     description: |-
       Endpoints accessible via admin authentication (/admin_auth → JWT).
-      Scopes: dlx.tokenmanagement, dlx.import.
-      Note: Some endpoints (e.g. /tokens CRUD) support both DLX-ConsumerRole and DLX-ManagementRole
+      Scopes: dlx.tokens, dlx.import.
+      Note: Some endpoints (e.g. /tokens CRUD) support both DLX-ConsumerContext and DLX-ManagementContext
       but use different authentication methods (TFA vs /admin_auth).
   - name: DLX-Info
     description: Provides information on version and implemented capabilities of the API

@@ -12,7 +12,7 @@ Die DLX (DICOM Link Exchange) API basiert ursprünglich auf der deutschen DIN-No
 
 **Version:** 2.0  
 **Basis:** DIN/TS 19455:2025-03
-**Letzte Aktualisierung:** März 2026
+**Letzte Aktualisierung:** April 2026
 
 ---
 
@@ -34,24 +34,25 @@ Vollständiges CRUD für DLX-Token-Links mit Paginierung, Filterung und Token-De
 - **Filterung** - Filtern nach `patientId`, `studyInstanceUid`, `accessionNumber`
 - **Token-Derivation** - Erstellen abgeleiteter Token mit eingeschränktem Scope
 
-**Security:** `adminOidcAuth` mit `dlx.creator`/`dlx.admin` oder `bearerAuth` mit `dlx.derive`
+**Security:** 
+- `adminBearerAuth` mit Scope `dlx.tokens` (via `/admin_auth`)
+- `bearerAuth` mit Scope `dlx.derive` (via TFA-Authentifizierung)
 
 ---
 
-### 2. OIDC-Authentifizierung
+### 2. Admin-Authentifizierung
 
-Professionelle Authentifizierung für administrative Endpoints.
+JWT-basierte Authentifizierung für administrative Zugriffe.
 
 **Neuer Endpoint:**
-- `GET /.well-known/openid-configuration` - OIDC Discovery Document (RFC 8414)
+- `POST /admin_auth` - Authentifizierung mit Admin-Credentials → JWT
 
-**Neue Security-Schemes:**
-- `adminOidcAuth` - OpenID Connect für administrative Endpoints
+**Neue Security-Scheme:**
+- `adminBearerAuth` - JWT Bearer für administrative Endpoints
 
 **OAuth 2.0 Scopes:**
-- `dlx.creator` - Erstellen und Verwalten von Token-Links
-- `dlx.importer` - Importieren externer DLX-Links
-- `dlx.admin` - Vollständiger Admin-Zugriff (überschreibt andere Scopes)
+- `dlx.tokens` - Erstellen und Verwalten von Token-Links
+- `dlx.import` - Importieren externer DLX-Links
 
 ---
 
@@ -67,7 +68,7 @@ Austausch von Daten zwischen DLX-Systemen.
 - Synchroner Trigger mit asynchronem Hintergrundprozess
 - Sofortige Antwort (200) oder Status-Update (202) mit `statusUrl`
 
-**Security:** `adminOidcAuth` mit `dlx.importer` oder `dlx.admin` Scope
+**Security:** `adminBearerAuth` mit `dlx.import` Scope
 
 ---
 
@@ -85,11 +86,24 @@ Die `dicomweb` Capability in der `/api_info` Antwort gibt an, ob WADO-RS (Retrie
 
 ---
 
+### 5. Context-basierte Tags
+
+Zusätzliche Tags zur Klassifizierung der Authentifizierungsmethoden:
+
+| Tag | Beschreibung |
+|-----|--------------|
+| `DLX-ConsumerContext` | Endpoints via TFA-Authentifizierung (/token → /tokentfa → JWT). Scope: `dlx.derive` |
+| `DLX-ManagementContext` | Endpoints via Admin-Authentifizierung (/admin_auth → JWT). Scopes: `dlx.tokens`, `dlx.import` |
+
+Einige Endpoints (z.B. `/tokens` CRUD) unterstützen beide Contexte mit unterschiedlichen Authentifizierungsmethoden.
+
+---
+
 ## 📊 Aktuelle API-Struktur
 
 ### Endpoints nach Rolle
 
-#### DLX-Consumer (Download)
+#### DLX-Download (Consumer)
 | Endpoint | Methode | Auth | Beschreibung |
 |------|---------|------|-----------|
 | `/token/{value}` | GET | None | TFA-Fragen abrufen |
@@ -98,38 +112,40 @@ Die `dicomweb` Capability in der `/api_info` Antwort gibt an, ob WADO-RS (Retrie
 | `/download/{id}` | GET | JWT | Download einzelnes Objekt |
 | `/downloadall` | GET | JWT | Download aller Objekte als ZIP |
 
-#### DLX-Creator (Token-Management)
+#### DLX-Tokens
 | Endpoint | Methode | Auth | Beschreibung |
 |------|---------|------|-----------|
-| `/tokens` | POST | OIDC/Bearer | Token erstellen |
-| `/tokens` | GET | OIDC/Bearer | Alle Token auflisten (paginiert) |
-| `/tokens/{token}` | GET | OIDC/Bearer | Token-Details |
-| `/tokens/{token}` | PUT | OIDC/Bearer | Token aktualisieren |
-| `/tokens/{token}` | DELETE | OIDC/Bearer | Token löschen |
+| `/tokens` | POST | adminBearerAuth / bearerAuth¹ | Token erstellen |
+| `/tokens` | GET | adminBearerAuth / bearerAuth¹ | Alle Token auflisten (paginiert) |
+| `/tokens/{token}` | GET | adminBearerAuth / bearerAuth¹ | Token-Details |
+| `/tokens/{token}` | PUT | adminBearerAuth / bearerAuth¹ | Token aktualisieren |
+| `/tokens/{token}` | DELETE | adminBearerAuth / bearerAuth¹ | Token löschen |
 
-#### DLX-Importer (Data Import)
+¹ `bearerAuth` mit `dlx.derive` Scope für Token Derivation (nur eigene abgeleitete Tokens)
+
+#### DLX-Import
 | Endpoint | Methode | Auth | Beschreibung |
 |------|---------|------|-----------|
-| `/import` | POST | OIDC | Externen DLX-Link importieren |
+| `/import` | POST | adminBearerAuth | Externen DLX-Link importieren |
 
-#### Info
+#### DLX-Info
 | Endpoint | Methode | Auth | Beschreibung |
 |------|---------|------|-----------|
 | `/api_info` | GET | None | API-Version und Capabilities |
-| `/.well-known/openid-configuration` | GET | None | OIDC Discovery Document |
+| `/tfa_info` | GET | adminBearerAuth | Unterstützte TFA-Optionen |
 
 ---
 
 ## 🔐 Authentifizierung
 
-### JWT Bearer Authentication
-- **Scope:** `dlx.consumer` - Download-Endpoints
-- **Scope:** `dlx.derive` - Token-Derivation über `/tokens`
+### JWT Bearer Authentication (`bearerAuth`)
+Für DLX-Download Endpoints nach TFA-Authentifizierung.
+- **Scope:** `dlx.derive` - Eingeschränkte Untertokens erstellen (Token Derivation)
 
-### OpenID Connect
-- **Scope:** `dlx.creator` - Token-Management
-- **Scope:** `dlx.importer` - Import-Endpoints
-- **Scope:** `dlx.admin` - Vollständiger Admin-Zugriff
+### Admin Bearer Authentication (`adminBearerAuth`)
+Für administrative Endpoints nach `/admin_auth` Authentifizierung.
+- **Scope:** `dlx.tokens` - Token-Management
+- **Scope:** `dlx.import` - Import-Endpoints
 
 ---
 
@@ -137,10 +153,9 @@ Die `dicomweb` Capability in der `/api_info` Antwort gibt an, ob WADO-RS (Retrie
 
 | Capability | Typ | Beschreibung |
 |------|-----|---|
-| `download` | boolean | DLX-Consumer Endpoints (token, list, download, downloadall) |
+| `download` | boolean | DLX-Download Endpoints (token, list, download, downloadall) |
 | `tokens` | boolean | Token-Management Endpoints (POST/GET/PUT/DELETE /tokens) |
 | `import` | boolean | Import-Endpoint (/import) |
-| `oidc` | boolean | OIDC Discovery Endpoint (/.well-known/openid-configuration) |
 | `derivation` | boolean | Token-Derivation (erstellen abgeleiteter Token) |
 | `dicomweb` | object | DICOMweb-Capabilities (WADO-RS, QIDO-RS) für direkte DICOM-Abfrage |
 
@@ -150,5 +165,5 @@ Die `dicomweb` Capability in der `/api_info` Antwort gibt an, ob WADO-RS (Retrie
 
 | Version | Datum | Änderungen |
 |---------|-----|--------|
-| **2.0** | März 2026 | Token-Management, OIDC-Authentifizierung, Import-Funktionalität, DICOMweb-Integration |
+| **2.0** | April 2026 | Token-Management, Admin-Authentifizierung, Import-Funktionalität, DICOMweb-Integration, Context-basierte Tags |
 | **1.0** | März 2025 | DIN/TS 19455:2025-03 |
