@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant C as ConsumerContext
+    participant D as DLX API
+
+    C->>D: GET /token/{value}<br/>X-DICOM-LINK-EXCHANGE header
+    D-->>C: TFA Questions
+
+    C->>D: POST /tokentfa/{value}<br/>TFA Answers
+    D-->>C: JWT
+
+    C->>D: GET /list<br/>Authorization: Bearer JWT
+    D-->>C: Data Items
+
+    C->>D: GET /download/{id}<br/>Authorization: Bearer JWT
+    D-->>C: Binary Data
+
+    C->>D: GET /downloadall<br/>Authorization: Bearer JWT
+    D-->>C: ZIP (IHE PDI)

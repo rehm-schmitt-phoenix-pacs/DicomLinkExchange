@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant C as ConsumerContext
+    participant D as DLX API
+
+    C->>D: GET /token/{value}<br/>X-DICOM-LINK-EXCHANGE header
+    D-->>C: TFA Questions
+
+    C->>D: POST /tokentfa/{value}<br/>TFA Answers
+    D-->>C: JWT (dlx.derive)
+
+    Note over C,D: Token must have allowDerivation: true
+
+    C->>D: POST /tokens<br/>Authorization: Bearer JWT<br/>{ patientId, studyInstanceUids (subset),<br/>expiresAt ≤ parent, allowDerivation: false }
+    D-->>D: Validate: subset of parent token
+    D-->>C: Derived Token Details + Link
+
+    Note over C,D: Derived token restrictions:<br/>- expiresAt ≤ parent expiresAt<br/>- studyInstanceUids ⊆ parent studyInstanceUids<br/>- Only own derived tokens can be managed

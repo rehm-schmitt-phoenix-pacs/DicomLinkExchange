@@ -34,13 +34,68 @@ Vollständiges CRUD für DLX-Token-Links mit Paginierung, Filterung und Token-De
 - **Filterung** - Filtern nach `patientId`, `studyInstanceUid`, `accessionNumber`
 - **Token-Derivation** - Erstellen abgeleiteter Token mit eingeschränktem Scope
 
-**Security:** `bearerAuth` mit `dlx.derive` Scope
+**Security:** 
+- `adminBearerAuth` mit Scope `dlx.tokens` (via `/admin_auth`)
+- `bearerAuth` mit Scope `dlx.derive` (via TFA-Authentifizierung)
 
-**Wichtige Hinweise:**
-- Der `dlx.derive` Scope wird nur vergeben, wenn der erstellende Token mit `allowDerivation: true` erstellt wurde
-- Bei Verwendung von bearerAuth für DLX-Creator Endpunkte müssen die erstellten/aktualisierten Token ein Subset der erstellenden Token-Berechtigungen sein
-- `expiresAt` darf nicht über die Gültigkeit des erstellenden Tokens hinausgehen
-- Die Datenobjekte (Studien) können eingeschränkt werden (weniger Studien als Eltern-Token)
+---
+
+### 2. Admin-Authentifizierung
+
+JWT-basierte Authentifizierung für administrative Zugriffe.
+
+**Neuer Endpoint:**
+- `POST /admin_auth` - Authentifizierung mit Admin-Credentials → JWT
+
+**Neue Security-Scheme:**
+- `adminBearerAuth` - JWT Bearer für administrative Endpoints
+
+**OAuth 2.0 Scopes:**
+- `dlx.tokens` - Erstellen und Verwalten von Token-Links
+- `dlx.import` - Importieren externer DLX-Links
+
+---
+
+### 3. Import-Funktionalität
+
+Austausch von Daten zwischen DLX-Systemen.
+
+**Neuer Endpoint:**
+- `POST /import` - Importieren externer DLX-Links
+
+**Beschreibung:**
+- Importiert Daten von einem externen DLX-Link
+- Synchroner Trigger mit asynchronem Hintergrundprozess
+- Sofortige Antwort (200) oder Status-Update (202) mit `statusUrl`
+
+**Security:** `adminBearerAuth` mit `dlx.import` Scope
+
+---
+
+### 4. DICOMweb-Integration
+
+Unterstützung für DICOMweb-Dienste (WADO-RS und QIDO-RS) zur direkten Abfrage von DICOM-Daten.
+
+**Neue Capability:** `dicomweb` in `/api_info`
+
+Die `dicomweb` Capability in der `/api_info` Antwort gibt an, ob WADO-RS (Retrieve) und QIDO-RS (Query) für DICOM-Daten verfügbar sind. DLX Bearer-Tokens können für die Authentifizierung an diesen Endpoints verwendet werden, eingeschränkt auf die Study UIDs des jeweiligen Tokens.
+
+**JWT-Authentifizierung:**
+- DLX Bearer-Token wird für DICOMweb-Endpoints akzeptiert
+- Eingeschränkt auf Study UIDs des Tokens
+
+---
+
+### 5. Context-basierte Tags
+
+Zusätzliche Tags zur Klassifizierung der Authentifizierungsmethoden:
+
+| Tag | Beschreibung |
+|-----|--------------|
+| `DLX-ConsumerContext` | Endpoints via TFA-Authentifizierung (/token → /tokentfa → JWT). Scope: `dlx.derive` |
+| `DLX-ManagementContext` | Endpoints via Admin-Authentifizierung (/admin_auth → JWT). Scopes: `dlx.tokens`, `dlx.import` |
+
+Einige Endpoints (z.B. `/tokens` CRUD) unterstützen beide Contexte mit unterschiedlichen Authentifizierungsmethoden.
 
 ---
 
@@ -48,7 +103,7 @@ Vollständiges CRUD für DLX-Token-Links mit Paginierung, Filterung und Token-De
 
 ### Endpoints nach Rolle
 
-#### DLX-Consumer (Download)
+#### DLX-Download (Consumer)
 | Endpoint | Methode | Auth | Beschreibung |
 |------|---------|------|-----------|
 | `/token/{value}` | GET | None | TFA-Fragen abrufen |
@@ -57,40 +112,40 @@ Vollständiges CRUD für DLX-Token-Links mit Paginierung, Filterung und Token-De
 | `/download/{id}` | GET | JWT | Download einzelnes Objekt |
 | `/downloadall` | GET | JWT | Download aller Objekte als ZIP |
 
-#### DLX-Creator (Token-Management)
+#### DLX-Tokens
 | Endpoint | Methode | Auth | Beschreibung |
 |------|---------|------|-----------|
-| `/tokens` | POST | Bearer¹ | Token erstellen |
-| `/tokens` | GET | Bearer¹ | Alle Token auflisten (paginiert) |
-| `/tokens/{token}` | GET | Bearer¹ | Token-Details |
-| `/tokens/{token}` | PUT | Bearer¹ | Token aktualisieren |
-| `/tokens/{token}` | DELETE | Bearer¹ | Token löschen |
+| `/tokens` | POST | adminBearerAuth / bearerAuth¹ | Token erstellen |
+| `/tokens` | GET | adminBearerAuth / bearerAuth¹ | Alle Token auflisten (paginiert) |
+| `/tokens/{token}` | GET | adminBearerAuth / bearerAuth¹ | Token-Details |
+| `/tokens/{token}` | PUT | adminBearerAuth / bearerAuth¹ | Token aktualisieren |
+| `/tokens/{token}` | DELETE | adminBearerAuth / bearerAuth¹ | Token löschen |
 
-¹ Bearer mit `dlx.derive` Scope für Token Derivation (nur eigene abgeleitete Tokens)
+¹ `bearerAuth` mit `dlx.derive` Scope für Token Derivation (nur eigene abgeleitete Tokens)
 
-**Wichtige Hinweise:**
-- Der `dlx.derive` Scope wird nur vergeben, wenn der erstellende Token mit `allowDerivation: true` erstellt wurde
-- Bei Verwendung von bearerAuth für DLX-Creator Endpunkte müssen die erstellten/aktualisierten Token ein Subset der erstellenden Token-Berechtigungen sein
-- `expiresAt` darf nicht über die Gültigkeit des erstellenden Tokens hinausgehen
-- Die Datenobjekte (Studien) können eingeschränkt werden (weniger Studien als Eltern-Token)
+#### DLX-Import
+| Endpoint | Methode | Auth | Beschreibung |
+|------|---------|------|-----------|
+| `/import` | POST | adminBearerAuth | Externen DLX-Link importieren |
 
-#### Info
+#### DLX-Info
 | Endpoint | Methode | Auth | Beschreibung |
 |------|---------|------|-----------|
 | `/api_info` | GET | None | API-Version und Capabilities |
-| `/tfa_info` | GET | Bearer | Unterstützte TFA-Optionen (authentifiziert) |
+| `/tfa_info` | GET | adminBearerAuth | Unterstützte TFA-Optionen |
 
 ---
 
 ## 🔐 Authentifizierung
 
-### JWT Bearer Authentication
-- **Scope:** `dlx.consumer` - Download-Endpoints
-- **Scope:** `dlx.derive` - Token-Management über `/tokens`
+### JWT Bearer Authentication (`bearerAuth`)
+Für DLX-Download Endpoints nach TFA-Authentifizierung.
+- **Scope:** `dlx.derive` - Eingeschränkte Untertokens erstellen (Token Derivation)
 
-**Wichtige Hinweise:**
-- Der `dlx.derive` Scope wird nur vergeben, wenn der erstellende Token mit `allowDerivation: true` erstellt wurde
-- Bei Verwendung von bearerAuth für DLX-Creator Endpunkte müssen die erstellten/aktualisierten Token ein Subset der erstellenden Token-Berechtigungen sein
+### Admin Bearer Authentication (`adminBearerAuth`)
+Für administrative Endpoints nach `/admin_auth` Authentifizierung.
+- **Scope:** `dlx.tokens` - Token-Management
+- **Scope:** `dlx.import` - Import-Endpoints
 
 ---
 
@@ -98,8 +153,9 @@ Vollständiges CRUD für DLX-Token-Links mit Paginierung, Filterung und Token-De
 
 | Capability | Typ | Beschreibung |
 |------|-----|---|
-| `download` | boolean | DLX-Consumer Endpoints (token, list, download, downloadall) |
+| `download` | boolean | DLX-Download Endpoints (token, list, download, downloadall) |
 | `tokens` | boolean | Token-Management Endpoints (POST/GET/PUT/DELETE /tokens) |
+| `import` | boolean | Import-Endpoint (/import) |
 | `derivation` | boolean | Token-Derivation (erstellen abgeleiteter Token) |
 | `dicomweb` | object | DICOMweb-Capabilities (WADO-RS, QIDO-RS) für direkte DICOM-Abfrage |
 
@@ -109,5 +165,5 @@ Vollständiges CRUD für DLX-Token-Links mit Paginierung, Filterung und Token-De
 
 | Version | Datum | Änderungen |
 |---------|-----|--------|
-| **2.0** | April 2026 | Token-Management, bearerAuth mit dlx.derive für DLX-Creator, DICOMweb-Integration |
+| **2.0** | April 2026 | Token-Management, Admin-Authentifizierung, Import-Funktionalität, DICOMweb-Integration, Context-basierte Tags |
 | **1.0** | März 2025 | DIN/TS 19455:2025-03 |
