@@ -1,0 +1,24 @@
+sequenceDiagram
+    participant I as ManagementContext
+    participant D as DLX API
+    participant E as External DLX
+
+    I->>D: POST /admin_auth<br/>{ username, password, scope: "dlx.import" }
+    D-->>I: JWT (scope: dlx.import)
+
+    I->>D: POST /import<br/>Authorization: Bearer JWT<br/>{ link, token, tfaAnswer }
+
+    D->>E: GET /token/{value}<br/>from external link
+    E-->>D: TFA Questions
+
+    D->>E: POST /tokentfa/{value}<br/>TFA Answers
+    E-->>D: JWT
+
+    D->>E: GET /downloadall<br/>with external JWT
+    E-->>D: DICOM Data
+
+    alt Synchronous (fast)
+        D-->>I: 200 - Import completed
+    else Asynchronous (slow)
+        D-->>I: 202 - Import started<br/>{ statusUrl }
+    end

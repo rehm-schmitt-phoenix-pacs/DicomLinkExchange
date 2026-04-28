@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant A as ManagementContext
+    participant D as DLX API
+
+    A->>D: POST /admin_auth<br/>{ username, password, scope: "dlx.tokens" }
+    D-->>A: JWT (scope: dlx.tokens)
+
+    A->>D: POST /tokens<br/>Authorization: Bearer JWT
+    D-->>D: Create Token Link
+    D-->>A: Token Details + Link
+
+    A->>D: GET /tokens?page=1&pageSize=20<br/>Authorization: Bearer JWT
+    D-->>A: Paginated Token List
+
+    A->>D: GET /tokens/{token}<br/>Authorization: Bearer JWT
+    D-->>A: Token Details
+
+    A->>D: PUT /tokens/{token}<br/>Authorization: Bearer JWT
+    D-->>A: Updated Token Details
+
+    A->>D: DELETE /tokens/{token}<br/>Authorization: Bearer JWT
+    D-->>A: 204 No Content

@@ -22,18 +22,18 @@ Die DLX API unterscheidet zwei Authentifizierungskontexte:
 
 | Kontext | Beschreibung | Authentifizierung |
 |---------|--------------|-------------------|
-| **DLX-ConsumerContext** | Patienten/Ärzte, die Daten über Token-Links herunterladen | TFA → JWT |
-| **DLX-ManagementContext** | Administratoren/Systeme, die Token-Links verwalten oder Daten importieren | `/admin_auth` → JWT |
+| **DLX-ConsumerContext** | ConsumerContext: Daten über Token-Links herunterladen | TFA → JWT |
+| **DLX-ManagementContext** | ManagementContext: Token-Links verwalten oder Daten importieren | `/admin_auth` → JWT |
 
 ---
 
 ## Workflows
 
-### DLX-Consumer Workflow
+### DLX-ConsumerContext Workflow
 
-Patienten oder Ärzte erhalten einen Token-Link (z.B. per E-Mail oder QR-Code) und laden damit medizinische Daten herunter.
+ConsumerContext: Patienten oder Ärzte erhalten einen Token-Link (z.B. per E-Mail oder QR-Code) und laden damit medizinische Daten herunter.
 
-![DLX-Consumer Workflow](workflow-consumer.png)
+![DLX-ConsumerContext Workflow](workflow-consumer.png)
 
 **Schritte:**
 1. **Token abrufen**: `GET /token/{value}` mit `X-DICOM-LINK-EXCHANGE` Header
@@ -42,11 +42,11 @@ Patienten oder Ärzte erhalten einen Token-Link (z.B. per E-Mail oder QR-Code) u
 4. **Daten auflisten**: `GET /list` mit Bearer-Token
 5. **Daten herunterladen**: `GET /download/{id}` oder `GET /downloadall`
 
-### DLX-Tokens Workflow
+### DLX-Tokens Workflow (ManagementContext)
 
-Administratoren erstellen Token-Links für Patienten, um diesen Zugriff auf ihre medizinischen Daten zu gewähren.
+ManagementContext: Erstellen von Token-Links für Patienten, um diesen Zugriff auf ihre medizinischen Daten zu gewähren.
 
-![DLX-Tokens Workflow](workflow-creator.png)
+![DLX-Tokens Workflow](workflow-tokens.png)
 
 **Schritte:**
 1. **Admin-Authentifizierung**: `POST /admin_auth` mit Credentials und Scope `dlx.tokens`
@@ -55,9 +55,9 @@ Administratoren erstellen Token-Links für Patienten, um diesen Zugriff auf ihre
 4. **TFA konfigurieren**: Optional Sicherheitsfragen definieren
 5. **Link versenden**: Token-Link an Patienten senden
 
-### DLX-Import Workflow
+### DLX-Import Workflow (ManagementContext)
 
-Systeme importieren Daten von externen DLX-Instanzen (z.B. andere Krankenhäuser).
+ManagementContext: Importieren von Daten von externen DLX-Instanzen (z.B. andere Krankenhäuser).
 
 ![DLX-Import Workflow](workflow-importer.png)
 
@@ -67,9 +67,9 @@ Systeme importieren Daten von externen DLX-Instanzen (z.B. andere Krankenhäuser
 3. **Import anstoßen**: `POST /import` mit externem Link und TFA-Daten
 4. **Daten empfangen**: Synchron (200) oder asynchron (202)
 
-### DICOMweb WADO-RS Workflow
+### DICOMweb WADO-RS Workflow (ConsumerContext)
 
-Der DLX Bearer Token kann für den Zugriff auf DICOMweb WADO-RS Endpunkte verwendet werden.
+ConsumerContext: Der DLX Bearer Token kann für den Zugriff auf DICOMweb WADO-RS Endpunkte verwendet werden.
 
 ![DICOMweb WADO-RS Workflow](workflow-wadors.png)
 
@@ -86,12 +86,14 @@ Der DLX Bearer Token kann für den Zugriff auf DICOMweb WADO-RS Endpunkte verwen
 - `GET /studies/{studyUID}/series` - Serien einer Studie
 - `GET /studies/{studyUID}/series/{seriesUID}/instances` - Instanzen einer Serie
 
-### Token Derivation Workflow
+### Token Derivation Workflow (ConsumerContext)
 
-DLX-Consumer mit `dlx.derive` Scope können eingeschränkte Untertokens für Dritte erstellen.
+DLX-ConsumerContext mit `dlx.derive` Scope können eingeschränkte Untertokens für Dritte erstellen.
+
+![Token Derivation Workflow](workflow-derive.png)
 
 **Schritte:**
-1. **TFA-Authentifizierung**: Normaler DLX-Consumer Workflow
+1. **TFA-Authentifizierung**: Normaler DLX-ConsumerContext Workflow
 2. **JWT mit dlx.derive Scope**: Token muss `allowDerivation: true` haben
 3. **Untertoken erstellen**: `POST /tokens` mit Bearer-Token
 4. **Eingeschränkter Zugriff**: Untertoken kann nur Subset der Eltern-Studien und kürzere Gültigkeit haben
@@ -219,11 +221,11 @@ Authorization: Bearer {jwt_with_dlx_derive_scope}
 
 ## Authentifizierung
 
-### DLX-Consumer (TFA → JWT)
+### DLX-ConsumerContext (TFA → JWT)
 
 ```
 ┌─────────────┐     GET /token/{value}      ┌─────────────┐
-│   Consumer  │ ──────────────────────────► │   DLX API   │
+│  Consumer   │ ──────────────────────────► │   DLX API   │
 │             │ ◄────────────────────────── │             │
 │             │     TFA Questions           │             │
 │             │                             │             │

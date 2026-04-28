@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant C as ConsumerContext
+    participant D as DLX API
+    participant W as DICOMweb<br/>(WADO-RS)
+
+    C->>D: GET /token/{value}<br/>X-DICOM-LINK-EXCHANGE header
+    D-->>C: TFA Questions
+
+    C->>D: POST /tokentfa/{value}<br/>TFA Answers
+    D-->>C: JWT
+
+    C->>D: GET /api_info<br/>Authorization: Bearer JWT
+    D-->>C: Capabilities + WADO-RS URL
+
+    C->>W: GET /studies/{studyUID}<br/>Authorization: Bearer JWT
+    W-->>C: DICOM Objects<br/>(limited to studyInstanceUids)

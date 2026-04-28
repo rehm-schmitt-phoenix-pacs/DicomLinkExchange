@@ -210,6 +210,7 @@ paths:
         - DLX-ConsumerContext
       security:
         - adminBearerAuth: [dlx.tokens]
+        - bearerAuth: [dlx.derive]
       responses:
         "200":
           description: Supported TFA options returned successfully.
@@ -262,6 +263,7 @@ paths:
         "500":
           description: Internal server error.
       security:
+        - adminBearerAuth: [dlx.tokens]
         - bearerAuth: [dlx.derive]
     get:
       operationId: listTokens
