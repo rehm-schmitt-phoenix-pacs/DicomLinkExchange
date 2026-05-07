@@ -590,6 +590,8 @@ components:
               type: string
           vendorInformation:
               type: string
+          contactInformation:
+              type: string              
           apiBasePath:
               type: string
           capabilities:
@@ -616,6 +618,7 @@ components:
       example:
           dlxVersion: v2
           vendorInformation: DLX Company Ltd.
+          contactInformation: "Radiology, +1 234 567 890, support@radiology.dlx"
           apiBasePath: https://example.com/portal/dlx/v2
           capabilities:
               download: true
