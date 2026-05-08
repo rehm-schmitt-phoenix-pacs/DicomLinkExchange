@@ -590,6 +590,8 @@ components:
               type: string
           vendorInformation:
               type: string
+          contactInformation:
+              type: string              
           apiBasePath:
               type: string
           capabilities:
@@ -616,6 +618,7 @@ components:
       example:
           dlxVersion: v2
           vendorInformation: DLX Company Ltd.
+          contactInformation: "Radiology, +1 234 567 890, support@radiology.dlx"
           apiBasePath: https://example.com/portal/dlx/v2
           capabilities:
               download: true
@@ -641,6 +644,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/tfaQuestion'
+      example:
+        tfaQuestion:
+          - question: [{text: "Wann ist Ihr Geburtsdatum?",language: "de"}, {text: "What is your date of birth?",language: "en"}]
+            questionId: "1"
+            questionType: PAT_BIRTH_DATE
+            answerFormat: DATE
+          - question: [{text: "Wie heißt Ihr Hausarzt?", language: "de"}, {text: "What is the name of your family doctor?", language: "en"}]
+            questionId: "2"
+            questionType: CUSTOM
+            answerFormat: STRING
 
     tfaQuestion:
         description: Tfa question that must be answered by the user or an automated system.
@@ -669,14 +682,10 @@ components:
               * `DATE` - date formated as YYYYMMDD
               * `STRING` - arbitrary string
         example:
-          - question: [{text: "Wann ist Ihr Geburtsdatum?",language: "de"}, {text: "What is your date of birth?",language: "en"}]
-            questionId: "1"
-            questionType: PAT_BIRTH_DATE
-            answerFormat: DATE
-          - question: [{text: "Wie heißt Ihr Hausarzt?", language: "de"}, {text: "What is the name of your family doctor?", language: "en"}]
-            questionId: "2"
-            questionType: CUSTOM
-            answerFormat: STRING
+          question: [{text: "Wann ist Ihr Geburtsdatum?",language: "de"}, {text: "What is your date of birth?",language: "en"}]
+          questionId: "1"
+          questionType: PAT_BIRTH_DATE
+          answerFormat: DATE
 
     question:
       description: Question, which is localizable (ISO 639).
@@ -689,10 +698,8 @@ components:
         language:
           type: string # Language as ISO 639 language code (e.g. 'de', 'en' etc.)
       example:
-        - text: Wann ist ihr Geburtsdatum?
-          language: de
-        - text: What is your date of birth?
-          language: en
+        text: Wann ist ihr Geburtsdatum?
+        language: de
 
     tfaAnswers:
       description: List of tfa answers.
@@ -702,6 +709,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/tfaAnswer'
+      example:
+        tfaAnswer:
+          - questionId: "1"
+            answer: "19700101"
+          - questionId: "2"
+            answer: "Dr. Bob"
 
     tfaAnswer:
       description: Tfa answer, referenced by its ID.
@@ -712,10 +725,8 @@ components:
         answer:
           type: string
       example:
-        - questionId: "1"
-          answer: "19700101"
-        - questionId: "2"
-          answer: "Dr. Bob"
+        questionId: "1"
+        answer: "19700101"
 
     dataItems:
       description: List of data items.
