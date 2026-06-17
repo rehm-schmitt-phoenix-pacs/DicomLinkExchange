@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DICOM Link Exchange – Demo Server</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f7fa;
+      color: #1a1a2e;
+      line-height: 1.6;
+      padding: 2rem;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 {
+      font-size: 1.8rem;
+      color: #16213e;
+      border-bottom: 3px solid #0f3460;
+      padding-bottom: .5rem;
+      margin-bottom: 1.5rem;
+    }
+    h2 {
+      font-size: 1.2rem;
+      color: #0f3460;
+      margin: 1.5rem 0 .5rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .card table { width: 100%; border-collapse: collapse; }
+    .card th, .card td {
+      text-align: left;
+      padding: .5rem .25rem;
+      border-bottom: 1px solid #eee;
+    }
+    .card th { font-weight: 600; color: #555; font-size: .85rem; }
+    .card tr:last-child td { border-bottom: none; }
+    code {
+      background: #eef1f5;
+      padding: .15rem .4rem;
+      border-radius: 4px;
+      font-size: .9rem;
+      color: #c7254e;
+    }
+    .badge {
+      display: inline-block;
+      background: #0f3460;
+      color: #fff;
+      font-size: .75rem;
+      padding: .15rem .5rem;
+      border-radius: 4px;
+      margin-right: .25rem;
+    }
+    a { color: #0f3460; }
+    .links { margin-top: 1rem; }
+    .links a {
+      display: inline-block;
+      margin-right: 1rem;
+      padding: .4rem .8rem;
+      background: #0f3460;
+      color: #fff;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: .9rem;
+    }
+    .links a:hover { background: #16213e; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>DICOM Link Exchange (DLX) – Demo Server</h1>
+
+  <div class="card">
+    <p>Dies ist ein Demo-Server für die DLX-Spezifikation.
+       Die API ermöglicht den sicheren Austausch von DICOM-Daten
+       mittels Token-basierter Authentifizierung.</p>
+  </div>
+
+  <div class="links">
+    <a href="/swagger-ui/index.html">Swagger UI</a>
+    <a href="/dlx/v1/api_info">API Info</a>
+  </div>
+
+  <h2>Verfügbare Demo-Tokens</h2>
+
+  <div class="card">
+    <table>
+      <tr>
+        <th>Token</th>
+        <th>Frage</th>
+        <th>Antwort</th>
+      </tr>
+      <tr>
+        <td><code>ABC-S1Z-98A</code></td>
+        <td>Wann haben Sie Geburtstag?</td>
+        <td><code>19700101</code></td>
+      </tr>
+      <tr>
+        <td><code>DF2-11Z-KS4</code></td>
+        <td>Wie lautet Ihr Einmal-Passwort?</td>
+        <td><code>132-238-252</code></td>
+      </tr>
+      <tr>
+        <td><code>HDF-34F-HK6</code></td>
+        <td>Wann war ihre Untersuchung?</td>
+        <td><code>20240419</code></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td>Wie heißt Ihr behandelnder Arzt?</td>
+        <td><code>Dr. Mayer</code></td>
+      </tr>
+    </tbody>
+    </table>
+  </div>
+
+  <h2>API-Endpunkte</h2>
+  <div class="card">
+    <table>
+      <tr><th>Methode</th><th>Pfad</th><th>Beschreibung</th></tr>
+      <tr><td><span class="badge">GET</span></td><td><code>/dlx/v1/api_info</code></td><td>API-Informationen</td></tr>
+      <tr><td><span class="badge">GET</span></td><td><code>/dlx/v1/token/{value}</code></td><td>Token einlösen, erhält TFA-Fragen</td></tr>
+      <tr><td><span class="badge">POST</span></td><td><code>/dlx/v1/tokentfa/{value}</code></td><td>TFA-Antworten senden, erhält JWT</td></tr>
+      <tr><td><span class="badge">GET</span></td><td><code>/dlx/v1/list</code></td><td>Verfügbare Studien auflisten</td></tr>
+      <tr><td><span class="badge">GET</span></td><td><code>/dlx/v1/download/{studyUid}</code></td><td>Studie herunterladen</td></tr>
+    </table>
+  </div>
+</div>
+</body>
+</html>

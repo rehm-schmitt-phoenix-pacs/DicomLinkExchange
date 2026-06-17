@@ -42,7 +42,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         httpSecurity.csrf().disable()
                 .authorizeRequests()
                 // exclude api-docs, swagger-ui and token endpoints from authentication
-                .antMatchers("/api-docs/**", "/swagger-ui/**", URL_BASE + "/token/**", URL_BASE + "/tokentfa/**", URL_BASE + "/api_info/**").permitAll()
+                .antMatchers("/", "/index.html", "/api-docs/**", "/swagger-ui/**", URL_BASE + "/token/**", URL_BASE + "/tokentfa/**", URL_BASE + "/api_info/**").permitAll()
                 // other requests must be authenticated by JWT
                 .anyRequest().authenticated().and()
                 // add JWT authentication implementation
