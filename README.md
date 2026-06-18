@@ -79,12 +79,12 @@ The documentation can be browsed at
 
 ## Docker
 
-Der Demo-Server kann als Docker-Container gebaut und gestartet werden.
+The demo server can be built and started as a Docker container.
 
-### Bauen
+### Building
 
     docker compose build
 
-### Starten
+### Starting
 
     docker compose up -d
