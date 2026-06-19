@@ -761,7 +761,7 @@ components:
             patientsName: Mustermann,Max
             patientsBirthdate: "19700101"
             patientsSex: M
-        - id: 9bd78345-6538-4219-9756-a979c9379730
+          - id: 9bd78345-6538-4219-9756-a979c9379730
             patientId: PID123
             accessionNumber: ACC456
             mimeType: image/jpeg
@@ -987,7 +987,7 @@ components:
                   patientsName: Mustermann,Max
                   patientsBirthdate: "19700101"
                   patientsSex: M
-               - id: 9bd78345-6538-4219-9756-a979c9379730
+                - id: 9bd78345-6538-4219-9756-a979c9379730
                   patientId: PID123
                   accessionNumber: ACC456
                   mimeType: image/jpeg
@@ -1166,8 +1166,8 @@ components:
               error: "derivation_exceeds_parent"
               details: "expiresAt cannot exceed 2024-03-10T16:15:50Z"
               
-      unexpectedError:
-            description: Unexpected internal error.              
+    unexpectedError:
+      description: Unexpected internal error.              
 
 tags:
   - name: DLX-Download
