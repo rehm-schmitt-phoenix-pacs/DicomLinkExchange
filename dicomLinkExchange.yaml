@@ -316,8 +316,8 @@ paths:
           schema:
             type: string
         - in: query
-          name: studyInstanceUid
-          description: "Filter by Study Instance UID. Multiple values (comma-separated) are combined with OR logic. Example: '?studyInstanceUid=uid1,uid2' returns tokens linked to either UID. Parameters are combined with AND logic."
+          name: studyInstanceUID
+          description: "Filter by Study Instance UID. Multiple values (comma-separated) are combined with OR logic. Example: '?studyInstanceUID=uid1,uid2' returns tokens linked to either UID. Parameters are combined with AND logic."
           required: false
           style: form
           explode: false
@@ -850,7 +850,7 @@ components:
         patientId:
           type: string
           description: Unique identifier of the patient (e.g., from DICOM tag PatientID (0010,0020)).
-        studyInstanceUids:
+        studyInstanceUIDs:
           type: array
           description: List of Study Instance UIDs (DICOM tag StudyInstanceUID (0020,000D)) that should be included in the download link.
           items:
@@ -872,7 +872,7 @@ components:
           description: Whether the created token can create further derived tokens. When set to true, the token can be used to access DLX-Tokens endpoints via bearerAuth with the dlx.derive scope.
       example:
         patientId: PID123
-        studyInstanceUids:
+        studyInstanceUIDs:
           - 1.2.276.0.23.60.1.2.14841915742092284318.1713520221786.0
         expiresAt: 2022-03-10T16:15:50Z
         tfaAnswer:
@@ -1089,7 +1089,7 @@ components:
         DLX-specific DICOMweb capabilities structure.
         Describes which DICOMweb services are available and their endpoints.
         The DLX bearer token SHOULD be accepted for authentication at these endpoints,
-        limited to the studyInstanceUids the token was issued for.
+        limited to the studyInstanceUIDs the token was issued for.
         See DICOM PS3.18 for DICOMweb specification.
       properties:
         wadoRs:
